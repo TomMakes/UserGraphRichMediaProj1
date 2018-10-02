@@ -3,7 +3,13 @@ const fs = require('fs');
 const index = fs.readFileSync(`${__dirname}/../client/client.html`);
 const css = fs.readFileSync(`${__dirname}/../client/style.css`);
 
-const users = {};
+const users = {
+  Tom: { name: 'Tom', water: '23' },
+  Harry: { name: 'Harry', water: '45' },
+  James: { name: 'James', water: '30' },
+  Steven: { name: 'Steven', water: '10' },
+};
+
 
 // function to respond with a json object
 // takes request, response, status code and object to send
@@ -53,7 +59,7 @@ const getNotReal = (request, response) => {
     message: 'The page you are looking for was not found',
   };
 
-  return respondJSON(request, response, 200, responseJSON);
+  return respondJSON(request, response, 404, responseJSON);
 };
 
 // function to add a user from a POST body
@@ -68,7 +74,7 @@ const addUser = (request, response, body) => {
   // We might want more validation than just checking if they exist
   // This could easily be abused with invalid types (such as booleans, numbers, etc)
   // If either are missing, send back an error message as a 400 badRequest
-  if (!body.name || !body.age) {
+  if (!body.name || !body.water) {
     responseJSON.id = 'missingParams';
     responseJSON.message = 'Please add a name and ID to your user';
     return respondJSON(request, response, 400, responseJSON);
@@ -88,7 +94,7 @@ const addUser = (request, response, body) => {
 
   // add or update fields for this user name
   users[body.name].name = body.name;
-  users[body.name].age = body.age;
+  users[body.name].water = body.water;
 
   // if response is created, then set our created message
   // and sent response with a message

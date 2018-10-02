@@ -5,6 +5,7 @@
   <link rel="stylesheet" type="text/css" href="/style.css">
   
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-core/5.8.34/browser.min.js"></script>
+  <script src="https://d3js.org/d3.v5.min.js"></script>
   <script type="text/babel">
     //function to parse our response
     const parseJSON = (xhr, content) => {
@@ -23,6 +24,9 @@
       if(obj.users) {
         const userList = document.createElement('p');
         const users = JSON.stringify(obj.users);
+        globalUsers = users;
+        console.log("checking if users goes into the global users");
+        console.dir(globalUsers);
         userList.textContent = users;
         content.appendChild(userList);
       }
@@ -67,9 +71,9 @@
       const nameAction = nameForm.getAttribute('action');
       const nameMethod = nameForm.getAttribute('method');
       
-      //grab the form's name and age fields so we can check user input
+      //grab the form's name and water fields so we can check user input
       const nameField = nameForm.querySelector('#nameField');
-      const ageField = nameForm.querySelector('#ageField');
+      const waterField = nameForm.querySelector('#waterField');
       
       //create a new Ajax request (remember this is asynchronous)
       const xhr = new XMLHttpRequest();
@@ -106,16 +110,16 @@
       return false;
     };
 
-    const sendGet = (e, userForm) => { 
+    const sendGet = (e) => { 
       //grab the forms action (url to go to)
       //and method
-      const nameAction = userForm.getAttribute('action');
-      const nameMethod = userForm.getAttribute('method');
+      //const nameAction = userForm.getAttribute('action');
+      //const nameMethod = userForm.getAttribute('method');
 
       //create a new Ajax request (remember this is asynchronous)
       const xhr = new XMLHttpRequest();
       //set the method (POST) and url (action field from form)
-      xhr.open(nameMethod, nameAction);
+      xhr.open("get", "/getUsers");
       
       //set our requested response type in hopes of a JSON response
       xhr.setRequestHeader ('Accept', 'application/json');
@@ -132,48 +136,132 @@
       return false;
     };
 
+    const updateWithGet = () => {
+      //create a new Ajax request (remember this is asynchronous)
+      console.log("Is this done yet?");
+      const xhr = new XMLHttpRequest();
+      //set the method (POST) and url (action field from form)
+      xhr.open("get", "/getUsers");
+      
+      //set our requested response type in hopes of a JSON response
+      xhr.setRequestHeader ('Accept', 'application/json');
+      
+      //set our function to handle the response
+      xhr.onload = () => handleResponse(xhr);
+      
+      //send our request with the data
+      xhr.send();
+    };
+
     const init = () => { 
       //grab name form
       const nameForm = document.querySelector('#nameForm');
       //Grab the getting form
       const userForm = document.querySelector('#userForm');
-      //const userForm = 
       //Grab method type
-      const methodSelect = document.querySelector('#methodSelect');
+      //const methodSelect = document.querySelector('#methodSelect');
       //Grab url to go to
-      const urlSelect = document.querySelector('#urlField');
+      //const urlSelect = document.querySelector('#urlField');
       //let requestType = 'GET';
-      const nameAction = nameForm.getAttribute('action');
-      const nameMethod = nameForm.getAttribute('method');
+      //const nameAction = nameForm.getAttribute('action');
+      //const nameMethod = nameForm.getAttribute('method');
+
+      updateWithGet();
       
       //create handler
       const addUser = (e) => sendPost(e, nameForm);
-      const getUser = (e) => sendGet(e, userForm);
+      //const getUser = (e) => sendGet(e, userForm);
       
       //attach submit event (for clicking submit or hitting enter)
       nameForm.addEventListener('submit', addUser);
-      userForm.addEventListener('submit', getUser);
+      //userForm.addEventListener('submit', getUser);
 
-      methodSelect.addEventListener('change', function () { document.getElementById("userForm").method = this.value; });
-      urlSelect.addEventListener('change', function () { document.getElementById("userForm").action = this.value; });
+      //methodSelect.addEventListener('change', function () { document.getElementById("userForm").method = this.value; });
+      //urlSelect.addEventListener('change', function () { document.getElementById("userForm").action = this.value; });
+
+     let fakeData = globalUsers;  
+     console.dir(fakeData);
+     console.log("trying the global users");
+     console.dir(globalUsers);
+  let w = 600;
+  let h = 400;
+
+  /* BAND SCALE 
+   * This is an ordinal scale. We give it a domain (a list of values) and the scale will 
+   * use the number of values to figure out how to space out items within the range. 
+   * Using paddingInner() will leave gaps between bars (the value given is a percentage of the band width).
+   * d3.range(maxNum) will return a range of numbers from 0 to maxNum. 
+   * */
+
+  let xScale = d3.scaleBand()
+                 .domain(d3.range(fakeData.length))
+                 .rangeRound([60, w - 20])
+                 .paddingInner(0.05);
+
+  let yScale = d3.scaleLinear()
+                 .domain([0, d3.max(fakeData.age, (d) => d)])
+                 .range([h - 20, 20]);
+
+  let svg = d3.select('#chart1')
+              .attr('width', w).attr('height',h);
+
+  // make our bars for our chart
+  // uses class of 'bar' for css styling
+  svg.selectAll('rect')
+    .data(fakeData)
+    .enter()
+    .append('rect')
+    .classed('bar', true)
+    .attr('x', (d,i) => xScale(i))      // we use the (d,i) form of function so that we can use the index number 
+                                        // of the datum with the band scale. 
+    .attr('y', (d) => yScale(d))
+    .attr('width', xScale.bandwidth())  // now we can use the calculated bandwidth from the band scale.
+    .attr('height', (d) => (h - 20) - yScale(d));
+
+  // putting in our axis
+  let xAxis = d3.axisBottom(xScale);
+  let xAxisGroup = svg.append('g')
+    .attr('id', 'x-axis')
+    .attr('transform', `translate(0, ${h - 20})`)
+    .call(xAxis);        // have to use .call() with d3's axis generators
+
+  let yAxis = d3.axisLeft(yScale);
+  let yAxisGroup = svg.append('g')
+    .attr('id', 'y-axis')
+    .attr('transform', 'translate(40, 0)')
+    .call(yAxis);        // have to use .call() with d3's axis generators
+
+  
+  /* AXIS LABEL */
+
+  // make a label for the y-axis
+  svg.append('text')
+    .classed('axis-label', true)
+    .attr('transform', 'rotate(-90)') // rotate 90 degrees counter-clockwise
+    .attr('text-anchor', 'middle')    // center text where we set x and y
+    .attr('x', -h/2)                  // because we rotated, use -h/2 to move 'left' which is down after transformation
+    .attr('y', 12)                    // use 12 to push to the right
+    .text('Fake Values');
       
     };
 
+    //Create global variable Users to be used in graphs and stored.
+    var globalUsers;
     window.onload = init;
 
   </script>
 </head>
 <body>
   <section id="top">
-    <h3>POST Status Code Tests</h3>
+    <h3>Competative Water Drinking</h3>
     <form id="nameForm" action="/addUser" method="post">
       <label for="name">Name: </label>
       <input id="nameField" type="text" name="name" />
-      <label for="age">Age: </label>
-      <input id="ageField" type="number" name="age" min="0" max="100" step="1"/>
-      <input type="submit" id="addUser" value="Add User" />
+      <label for="age">Cups of Water Drank: </label>
+      <input id="ageField" type="number" name="age" min="0" max="70" step="1"/>
+      <input type="submit" id="addUser" value="Add Participant" />
     </form>
-    <form id="userForm" action="/notReal" method="get">
+    <form id="userForm" action="/getUsers" method="get">
       <select id='urlField'>
         <option value='/getUsers'>/getUsers</option>
         <option value='/notReal'>/notReal</option>
@@ -187,5 +275,9 @@
   </section>
   <section id="content">
   </section>
+  <svg id='chart1'></svg>
+
+  <p>Did you know?</p>
+  <p>Insert water fact here that's stored within code</p>
 </body>
 </html>
