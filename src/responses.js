@@ -1,14 +1,21 @@
 const fs = require('fs');
 
 const index = fs.readFileSync(`${__dirname}/../client/client.html`);
-const css = fs.readFileSync(`${__dirname}/../client/style.css`);
+const css = fs.readFileSync(`${__dirname}/../hosted/style.css`);
 
 const users = {
-  Tom: { name: 'Tom', water: '23' },
-  Harry: { name: 'Harry', water: '45' },
-  James: { name: 'James', water: '30' },
-  Steven: { name: 'Steven', water: '10' },
-};
+  Tom: { 'name': 'Tom', 'water': 23 },
+  Harry: { 'name': 'Harry', 'water': 45 },
+  James: { 'name': 'James', 'water': 30 },
+  Steven: { 'name': 'Steven', 'water': 10 },
+}; 
+
+/*const users = [
+  { 'name': 'Tom', 'water': 23 },
+  { 'name': 'Harry', 'water': 45 },
+  { 'name': 'James', 'water': 30 },
+  { 'name': 'Steven', 'water': 10 },
+]; */
 
 
 // function to respond with a json object

@@ -4,31 +4,41 @@
   <title>Our simple HTTP server</title>
   <link rel="stylesheet" type="text/css" href="/style.css">
   
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-core/5.8.34/browser.min.js"></script>
   <script src="https://d3js.org/d3.v5.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-core/5.8.34/browser.min.js"></script>
+  
   <script type="text/babel">
     //function to parse our response
     const parseJSON = (xhr, content) => {
       //parse response (obj will be empty in a 204 updated)
       const obj = JSON.parse(xhr.response);
-      console.dir(obj);
       
-      //if message in response, add to screen
-      if(obj.message) {
+      //if message in response, add to screen Kept for Debugging only
+      /*if(obj.message) {
         const p = document.createElement('p');
         p.textContent = `Message: ${obj.message}`;
         content.appendChild(p);
-      }
+      } */
       
       //if users in response, add to screen
       if(obj.users) {
         const userList = document.createElement('p');
         const users = JSON.stringify(obj.users);
-        globalUsers = users;
-        console.log("checking if users goes into the global users");
-        console.dir(globalUsers);
+
+        //Probably don't need this code for making Users global
+        let usersArray = [];
+        //Make JSON into an array
+        for(var i in obj.users)
+          usersArray.push(obj.users [i]);
+          
+        //If data is new
+        if(oldUsers != users){
+            //passing in data to create the graph
+            makeWaterChart(usersArray);
+        }
+        oldUsers = users;
         userList.textContent = users;
-        content.appendChild(userList);
+        //content.appendChild(userList);
       }
     };
 
@@ -58,10 +68,9 @@
       }
 
       //parse response if user wasn't asking for a HEAD
-      if(methodSelect.text != 'HEAD')
-      {
+      
         parseJSON(xhr, content);
-      }
+      
     };
 
     //function to send our post request
@@ -99,7 +108,7 @@
       //So ours might look like  name=test&age=22
       //Again the 'name' fields in the form are the variable names in the string
       //and the variable names the server will look for.
-      const formData = `name=${nameField.value}&age=${ageField.value}`;
+      const formData = `name=${nameField.value}&water=${ageField.value}`;
       
       //send our request with the data
       xhr.send(formData);
@@ -138,7 +147,6 @@
 
     const updateWithGet = () => {
       //create a new Ajax request (remember this is asynchronous)
-      console.log("Is this done yet?");
       const xhr = new XMLHttpRequest();
       //set the method (POST) and url (action field from form)
       xhr.open("get", "/getUsers");
@@ -151,6 +159,203 @@
       
       //send our request with the data
       xhr.send();
+
+      //Loop this every second
+      setTimeout(updateWithGet, 100);
+    };
+    
+    //Shows the Name inside of a div 
+    function showBarData(d, bar) {
+        let rect = bar.node().getBoundingClientRect();
+        let tooltipRect = d3.select('#barInfo').node().getBoundingClientRect();
+
+        let y = rect.y - tooltipRect.height - 35; 
+        let x = rect.x + (rect.width / 2) - 85; 
+
+        d3.select('#barName').text(d.name)  // update date info
+
+        d3.select('#barInfo')
+          .classed('hidden', false)  // turn 'hidden' class off
+          .style('left', x + "px")   // update div's left to bar's x 
+          .style('top', y + "px");   // update div's top to bar's y
+    }
+
+    //When user hovers mouse over a bar.
+    function barMouseOver(d) {
+      let bar = d3.select(this);
+      bar.transition('selected')
+        //.style('fill', 'black');
+      showBarData(d, bar);
+    }
+
+    //User leaves bar
+    function barMouseOut(d) {
+      d3.select(this)
+        .transition('selected')
+        //.attr('fill', (d) => colorScale(d.water));
+    console.log("Mouse out");
+      d3.select('#barInfo')
+        .classed('hidden', true);
+    }
+
+  function makeWaterChart(dataset) {
+    console.log("making the chart");
+
+    //Setting height and width
+    let w = 1000;
+    let h = 600;
+
+    colorScale = d3.scaleLinear()
+                    .domain([0, d3.max(dataset, (d) => d.water)])
+                    .range(['#d5deed', '#005cf7']);
+
+    //Check if the graph has been created before
+    if(graphKey == null){
+      graphKey = (d) => d.name;
+
+      //Sort our data
+      dataset.sort((a,b) => b.water - a.water);
+
+      xScale = d3.scaleBand()
+                  .domain(dataset.map((d) => d.name))
+                  .rangeRound([20, w - 20])
+                  .paddingInner(0.05);
+
+      yScale = d3.scaleLinear()
+                   .domain([0, d3.max(dataset, (d) => d.water)])
+                   .range([h - 20, 20]);
+
+      let svg = d3.select('#chart1')
+                .attr('width', w).attr('height',h);
+
+      // make our bars for our chart
+      // uses class of 'bar' for css styling
+      svg.selectAll('rect')
+        .data(dataset, graphKey)
+        .enter()
+        .append('rect')
+        .classed('bar', true)
+        .attr('x', (d) => xScale(d.name) + 20)   
+        .attr('y', (d) => yScale(d.water))
+        .attr('width', xScale.bandwidth())  // now we can use the calculated bandwidth from the band scale.
+        .attr('height', (d) => h - 20 - yScale(d.water))
+        .attr('fill', (d) => colorScale(d.water))
+        .on('mouseover', barMouseOver)
+        .on('mouseout', barMouseOut);
+
+      //Check if there is a lot of data to show on graph
+      if(dataset.length > 10  && dataset.length < 16 )
+      {
+         // putting in our axis
+        xAxis = d3.axisBottom(xScale);
+        xAxisGroup = svg.append('g')
+          .attr('id', 'x-axis')
+          .style("font", "11px times")
+          .attr('transform', `translate(20, ${h - 20})`)
+          .call(xAxis);      
+      }
+      else if  (dataset.length < 16){
+        // putting in our axis
+        xAxis = d3.axisBottom(xScale);
+        xAxisGroup = svg.append('g')
+          .attr('id', 'x-axis')
+          .style("font", "14px times")
+          .attr('transform', `translate(20, ${h - 20})`)
+          .call(xAxis);        // have to use .call() with d3's axis generators
+      }  else if (dataset.length > 16){
+        xAxisGroup.transition('x-axis')
+            .duration(1000)
+            .style("font", "0px")
+            .call(xAxis);
+      }
+      
+      yAxis = d3.axisLeft(yScale);
+        yAxisGroup = svg.append('g')
+          .attr('id', 'y-axis')
+          .style("font", "14px times")
+          .attr('transform', 'translate(40, 0)')
+          .call(yAxis);        
+      
+       /* AXIS LABEL */
+      
+       // make a label for the y-axis
+       svg.append('text')
+         .classed('axis-label', true)
+         .attr('transform', 'rotate(-90)') // rotate 90 degrees counter-clockwise
+         .attr('text-anchor', 'middle')    // center text where we set x and y
+         .attr('x', -h/2)                  // because we rotated, use -h/2 to move 'left' which is down after transformation
+         .attr('y', 12)                    // use 12 to push to the right
+         .text('Cups of Water');
+
+    }
+    else{
+//~~~~~~~~~~~~~~~~~~~Update the graph 
+      let svg = d3.select('#chart1')
+            .attr('width', w).attr('height',h);
+      let bars = svg.selectAll('rect').data(dataset, graphKey);
+      let itemDelay = 20;
+
+      //Resort Data
+      dataset.sort((a,b) => b.water - a.water);
+
+      //update xScale domain and yScale
+      xScale.domain(dataset.map((d) => d.name));
+      xAxis.scale(xScale);
+
+      yScale.domain([0, d3.max(dataset, (d) => d.water)]);
+      yAxis.scale(yScale);
+      yAxisGroup.transition('y-axis')
+            .duration(1000)
+            .call(yAxis);
+
+      //Shrink xAxis Font Size for more data
+      if(dataset.length > 10 && dataset.length < 16 )
+      {
+        xAxisGroup.transition('x-axis')
+            .duration(1000)
+            .style("font", "11px times")
+            .call(xAxis);
+      }
+      else if  (dataset.length < 10){
+        xAxisGroup.transition('x-axis')
+            .duration(1000)
+            .call(xAxis);
+      }
+      else if (dataset.length > 16){
+        xAxisGroup.transition('x-axis')
+            .duration(1000)
+            .style("font", "11px times")
+            .style("opacity", 0)
+            .call(xAxis);
+      }
+      //Update Graph with new information
+      bars
+      .enter()
+        .append('rect')
+        .classed('bar', true)
+        .attr('x', (d) => xScale(d.name) + 20)
+        .attr('y', (d) => yScale(d.water))
+        .attr('height', (d) => h - 20 - yScale(d.water))
+        .attr('width', xScale.bandwidth()) 
+        .style("opacity", 0)
+        .on('mouseover', barMouseOver)
+        .on('mouseout', barMouseOut)
+      .merge(bars)
+        .transition()
+        .duration(1000)
+        .attr('x', (d) => xScale(d.name) + 20)
+        .attr('y', (d) => yScale(d.water))
+        .attr('height', (d) => h - 20 - yScale(d.water))
+        .attr('width', xScale.bandwidth()) 
+        .transition()
+        .duration(1000)
+        .style("opacity", 1.0)
+        .attr('height', (d) => h - 20 - yScale(d.water))
+        .attr('fill', (d) => colorScale(d.water));
+          
+    }
+
+       
     };
 
     const init = () => { 
@@ -179,76 +384,22 @@
       //methodSelect.addEventListener('change', function () { document.getElementById("userForm").method = this.value; });
       //urlSelect.addEventListener('change', function () { document.getElementById("userForm").action = this.value; });
 
-     let fakeData = globalUsers;  
-     console.dir(fakeData);
-     console.log("trying the global users");
-     console.dir(globalUsers);
-  let w = 600;
-  let h = 400;
-
-  /* BAND SCALE 
-   * This is an ordinal scale. We give it a domain (a list of values) and the scale will 
-   * use the number of values to figure out how to space out items within the range. 
-   * Using paddingInner() will leave gaps between bars (the value given is a percentage of the band width).
-   * d3.range(maxNum) will return a range of numbers from 0 to maxNum. 
-   * */
-
-  let xScale = d3.scaleBand()
-                 .domain(d3.range(fakeData.length))
-                 .rangeRound([60, w - 20])
-                 .paddingInner(0.05);
-
-  let yScale = d3.scaleLinear()
-                 .domain([0, d3.max(fakeData.age, (d) => d)])
-                 .range([h - 20, 20]);
-
-  let svg = d3.select('#chart1')
-              .attr('width', w).attr('height',h);
-
-  // make our bars for our chart
-  // uses class of 'bar' for css styling
-  svg.selectAll('rect')
-    .data(fakeData)
-    .enter()
-    .append('rect')
-    .classed('bar', true)
-    .attr('x', (d,i) => xScale(i))      // we use the (d,i) form of function so that we can use the index number 
-                                        // of the datum with the band scale. 
-    .attr('y', (d) => yScale(d))
-    .attr('width', xScale.bandwidth())  // now we can use the calculated bandwidth from the band scale.
-    .attr('height', (d) => (h - 20) - yScale(d));
-
-  // putting in our axis
-  let xAxis = d3.axisBottom(xScale);
-  let xAxisGroup = svg.append('g')
-    .attr('id', 'x-axis')
-    .attr('transform', `translate(0, ${h - 20})`)
-    .call(xAxis);        // have to use .call() with d3's axis generators
-
-  let yAxis = d3.axisLeft(yScale);
-  let yAxisGroup = svg.append('g')
-    .attr('id', 'y-axis')
-    .attr('transform', 'translate(40, 0)')
-    .call(yAxis);        // have to use .call() with d3's axis generators
-
-  
-  /* AXIS LABEL */
-
-  // make a label for the y-axis
-  svg.append('text')
-    .classed('axis-label', true)
-    .attr('transform', 'rotate(-90)') // rotate 90 degrees counter-clockwise
-    .attr('text-anchor', 'middle')    // center text where we set x and y
-    .attr('x', -h/2)                  // because we rotated, use -h/2 to move 'left' which is down after transformation
-    .attr('y', 12)                    // use 12 to push to the right
-    .text('Fake Values');
-      
     };
 
-    //Create global variable Users to be used in graphs and stored.
-    var globalUsers;
-    window.onload = init;
 
+    //Create global variable Uoldsers to be used in graphs and stored. 
+    //Determines if the graph needs to be updated
+    var oldUsers;
+    //The key holds each value for the graph so that it can be updated smoothly
+    var graphKey;
+    //Scales and Axis for the graph made global for updating purposes.
+    let xScale, yScale;
+    let xAxis, yAxis;
+    let xAxisGroup, yAxisGroup;
+    //The algorithm for determining color
+    let colorScale;
+    window.onload = init;
+    
   </script>
 </head>
 <body>
@@ -257,11 +408,11 @@
     <form id="nameForm" action="/addUser" method="post">
       <label for="name">Name: </label>
       <input id="nameField" type="text" name="name" />
-      <label for="age">Cups of Water Drank: </label>
+      <label for="age">Cups of Water Drunk: </label>
       <input id="ageField" type="number" name="age" min="0" max="70" step="1"/>
       <input type="submit" id="addUser" value="Add Participant" />
     </form>
-    <form id="userForm" action="/getUsers" method="get">
+   <!-- <form id="userForm" action="/getUsers" method="get">
       <select id='urlField'>
         <option value='/getUsers'>/getUsers</option>
         <option value='/notReal'>/notReal</option>
@@ -271,13 +422,17 @@
         <option value="HEAD">HEAD</option>
       </select>
       <input type="submit" value="Get User" />
-    </form>
+    </form> -->
   </section>
   <section id="content">
   </section>
   <svg id='chart1'></svg>
 
+  <div id="barInfo" class="hidden">
+    <p><strong>Name:</strong> <span id="barName"></span></p>
+  </div>
+
   <p>Did you know?</p>
-  <p>Insert water fact here that's stored within code</p>
+  <p id="facts">Insert water fact here that's stored within code</p>
 </body>
 </html>
